@@ -1,0 +1,14 @@
+# dsh-user-markdown bundle patch —— 把本插件挂载进 profile 树。
+#
+# 该文件由 dsh 的 bundle 层读取；只要本包出现在 profile 的
+# `dsh.profile.bundles` 列表中（`dsh plugin --profile web add <本目录>` 会自动写入），
+# 下面这条 insert 就会把插件条目追加到 cordis 装配树。
+#
+# 需要临时停用（不卸载）时，把本文件改成：
+#   - insert:
+#       - id: dsh-user-markdown
+#         name: 'dsh-user-markdown'
+#         disabled: true
+- insert:
+    - id: dsh-user-markdown
+      name: 'dsh-user-markdown'

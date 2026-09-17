@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>dsh-user-markdown — browser harness</title>
+<style>
+  :root { color-scheme: light; }
+  body {
+    margin: 0; padding: 20px 24px 60px;
+    font: 14px/1.5 -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+    background: #f5f6f8; color: #1b1c1e;
+  }
+  h1 { font-size: 16px; margin: 0 0 4px; }
+  .hint { color: #6b7280; font-size: 12px; margin: 0 0 18px; }
+  .case { margin: 0 0 20px; }
+  .case-title { font-size: 12px; color: #6b7280; margin: 0 0 6px; }
+  [data-chat-flow-kind], [data-submission-echo], [data-pending-steering] { margin-bottom: 10px; }
+  .userRow { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+  .userStack { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; max-width: 82%; min-width: 0; }
+  .bubble {
+    background: #e6ebf5; color: #1b1c1e;
+    border-radius: 22px; padding: 10px 16px; max-width: 100%;
+    font-size: 14px; line-height: 22px;
+    white-space: pre-wrap; word-break: break-word;
+  }
+  .actions { display: flex; gap: 8px; color: #9aa1ad; font-size: 12px; white-space: nowrap; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: #cfd8ea; border-radius: 6px; padding: 0 6px; font-size: 12px;
+  }
+  textarea { width: 320px; font: inherit; }
+  code { font-family: Consolas, Menlo, monospace; }
+</style>
+</head>
+<body>
+<h1>dsh-user-markdown — 浏览器验证台</h1>
+<p class="hint">
+  用与 DSH Web GUI 相同的 DOM 约定复刻气泡。
+  在控制台可用 <code>__harness.report()</code>（状态）、<code>__harness.react(id, 文本)</code>（模拟 React 更新文本）。
+</p>
+<div id="app"></div>
+
+<script>
+  /* ------------------------------------------------------------------
+   * 1. 构造与真实 GUI 结构一致的场景
+   * ------------------------------------------------------------------ */
+
+  var MD = [
+    '## 小标题',
+    '',
+    '正文 **加粗**、*斜体* 和 `行内代码`，还有 [链接](https://example.com)。',
+    '',
+    '- 第一项',
+    '- 第二项',
+    '',
+    '```js',
+    'const a = 1 < 2;',
+    '```'
+  ].join('\n');
+
+  var CASES = [
+    {
+      id: 'native',
+      title: '场景 1 · 原生风格气泡（data-chat-flow-kind="user" + pre-wrap）',
+      attrs: { 'data-chat-flow-kind': 'user' },
+      bubbleStyle: '',
+      text: MD
+    },
+    {
+      id: 'easyrewrite',
+      title: '场景 2 · dsh-easyrewrite 风格气泡（inline style white-space:pre-wrap）',
+      attrs: { 'data-chat-flow-kind': 'user' },
+      bubbleStyle: 'white-space:pre-wrap;word-break:break-word;',
+      text: '1. 打开 **输入框**\n2. 粘贴 `HTML` 片段\n3. 检查 <script>alert(1)</' + 'script> 是否被转义'
+    },
+    {
+      id: 'chip',
+      title: '场景 3 · 含引用 chip 的混合气泡（应保持原文，不渲染）',
+      attrs: { 'data-chat-flow-kind': 'user' },
+      bubbleStyle: '',
+      text: null,
+      mixed: true
+    },
+    {
+      id: 'editing',
+      title: '场景 4 · 编辑态气泡（含 textarea，应整条跳过）',
+      attrs: { 'data-chat-flow-kind': 'user' },
+      bubbleStyle: '',
+      text: null,
+      editing: true
+    },
+    {
+      id: 'echo',
+      title: '场景 5 · 本地乐观回显（data-submission-echo）',
+      attrs: { 'data-submission-echo': 'true' },
+      bubbleStyle: '',
+      text: '> 引用一句\n\n| a | b |\n| --- | --- |\n| 1 | 2 |'
+    },
+    {
+      id: 'steering',
+      title: '场景 6 · 插话消息（data-chat-flow-kind="steering"）',
+      attrs: { 'data-chat-flow-kind': 'steering' },
+      bubbleStyle: '',
+      text: '~~删掉这行~~ 保留这行\n换行第二行\n\n---\n\n结尾'
+    },
+    {
+      id: 'plain',
+      title: '场景 7 · 无 Markdown 的纯文本',
+      attrs: { 'data-chat-flow-kind': 'user' },
+      bubbleStyle: '',
+      text: '你好，这是一条普通消息。'
+    },
+    {
+      /* 回归 #1：真实会话里存下来的文本含孤立 CR。浏览器 pre-wrap 下 CR 不换行，
+         渲染器必须保持同一语义，否则反引号会被拆散、行内代码失效。 */
+      id: 'cr',
+      title: '场景 8 · 含孤立 CR 的历史消息（回归 #1：CR 不换行、反引号成对）',
+      attrs: { 'data-chat-flow-kind': 'user' },
+      bubbleStyle: '',
+      text: '我发给你一段文本 \r`AAA\r`\r\n这段文本采用了markdown格式的标记，对吗？'
+    }
+  ];
+
+  var app = document.getElementById('app');
+
+  CASES.forEach(function (item) {
+    var block = document.createElement('section');
+    block.className = 'case';
+    var title = document.createElement('p');
+    title.className = 'case-title';
+    title.textContent = item.title;
+    block.appendChild(title);
+
+    var host = document.createElement('div');
+    Object.keys(item.attrs).forEach(function (key) { host.setAttribute(key, item.attrs[key]) });
+    host.id = 'host-' + item.id;
+
+    var row = document.createElement('div');
+    row.className = 'userRow';
+    var stack = document.createElement('div');
+    stack.className = 'userStack';
+    var bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    bubble.id = 'bubble-' + item.id;
+    if (item.bubbleStyle) bubble.setAttribute('style', item.bubbleStyle);
+
+    if (item.editing) {
+      var area = document.createElement('textarea');
+      area.rows = 3;
+      area.value = '**编辑中的原文**';
+      bubble.appendChild(area);
+    } else if (item.mixed) {
+      bubble.appendChild(document.createTextNode('参考 '));
+      var chip = document.createElement('span');
+      chip.className = 'chip';
+      chip.textContent = 'file.md';
+      bubble.appendChild(chip);
+      bubble.appendChild(document.createTextNode(' 这一行 **不该** 被渲染'));
+    } else {
+      bubble.appendChild(document.createTextNode(item.text));
+    }
+
+    stack.appendChild(bubble);
+    row.appendChild(stack);
+
+    var actions = document.createElement('div');
+    actions.className = 'actions';
+    actions.appendChild(document.createTextNode('14:37'));
+    row.appendChild(actions);
+
+    host.appendChild(row);
+    block.appendChild(host);
+    app.appendChild(block);
+  });
+
+  /* ------------------------------------------------------------------
+   * 2. 以与 DSH 客户端模块系统相同的方式加载插件 bundle
+   * ------------------------------------------------------------------ */
+
+  window.__moduleRegistrations = [];
+  window.__ModuleLoader__ = {
+    load: function (registration) { window.__moduleRegistrations.push(registration) }
+  };
+</script>
+<script src="../lib/client.js"></script>
+<script>
+  (function () {
+    var reg = window.__moduleRegistrations.filter(function (r) { return r.id === 'dsh-user-markdown' })[0];
+    if (!reg) throw new Error('bundle 未注册');
+    var mod = reg.factory(function (spec) { throw new Error('本插件不请求外部模块：' + spec) });
+    window.__pluginModule = mod;
+    window.__pluginDispose = mod.apply({});
+
+    window.__harness = {
+      /** 各场景当前状态。 */
+      report: function () {
+        var out = {};
+        CASES.forEach(function (item) {
+          var bubble = document.getElementById('bubble-' + item.id);
+          var body = bubble.querySelector(':scope > [data-dsh-user-md-body]');
+          out[item.id] = {
+            rendered: body !== null,
+            html: body ? body.innerHTML.slice(0, 120) : null,
+            visibleText: (bubble.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 80)
+          };
+        });
+        return out;
+      },
+      /** 模拟 React 更新文本：直接改写文本节点的 nodeValue。 */
+      react: function (id, text) {
+        var bubble = document.getElementById('bubble-' + id);
+        for (var i = 0; i < bubble.childNodes.length; i++) {
+          if (bubble.childNodes[i].nodeType === 3) {
+            bubble.childNodes[i].nodeValue = text;
+            return true;
+          }
+        }
+        return false;
+      },
+      /** 模拟 React 整体重建气泡子树。 */
+      remount: function (id, text) {
+        var bubble = document.getElementById('bubble-' + id);
+        bubble.innerHTML = '';
+        bubble.appendChild(document.createTextNode(text));
+        return true;
+      },
+      render: function (source) { return window.__pluginModule.__test.renderMarkdown(source) }
+    };
+  })();
+</script>
+</body>
+</html>
