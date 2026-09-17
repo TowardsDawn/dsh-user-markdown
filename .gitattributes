@@ -1,0 +1,21 @@
+# 行尾策略：仓库与工作区统一使用 LF。
+#
+# 为什么需要它：在 Windows 上 `core.autocrlf=true` 时，Git 会把工作区文件
+# checkout 成 CRLF、提交时再转回 LF，于是每次 `git add` 都会刷
+# "LF will be replaced by CRLF the next time Git touches it" 的提示，
+# 且不同协作者的配置会把行尾混进仓库。这里显式声明，告警消失、跨平台一致。
+#
+# 注意：本插件对行尾不敏感（JS / JSON / YAML / Markdown 都接受 CRLF），
+# 这条规则是为了仓库整洁，不是功能需要。
+* text=auto eol=lf
+
+# 二进制：禁止任何文本转换 / 行尾处理
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.webp  binary
+*.ico   binary
+*.woff  binary
+*.woff2 binary
+*.ttf   binary
