@@ -79,10 +79,25 @@ DSH 只在**模型回复**里渲染 Markdown；用户自己的消息永远以纯
 
 **前置条件**：`dsh` 可执行、`pnpm` 在 PATH 上（`dsh plugin` 内部转发给 pnpm）。
 
-### 从本地克隆安装（推荐）
+### 方式一：直接从 GitHub 安装（最简单）
 
 ```bash
-git clone <repo-url> dsh-user-markdown
+dsh plugin --profile web add "github:TowardsDawn/dsh-user-markdown"
+```
+
+本插件**不需要构建**（`lib/client.js` 是手写的自包含 bundle，仓库里也没有 `prepare` 脚本），
+所以 pnpm 拉下来即可用，不会撞上 "build scripts blocked" 之类的提示。
+
+这是**拷贝**式安装：想更新时重新执行一次上面的 `add`，或
+
+```bash
+dsh plugin --profile web update dsh-user-markdown
+```
+
+### 方式二：本地克隆 + link（改源码即时生效）
+
+```bash
+git clone https://github.com/TowardsDawn/dsh-user-markdown.git
 
 # 把 <插件目录的绝对路径> 换成真实路径
 dsh plugin --profile web add "link:<插件目录的绝对路径>"
@@ -91,14 +106,14 @@ dsh plugin --profile web add "link:<插件目录的绝对路径>"
 Windows PowerShell 示例：
 
 ```powershell
-git clone <repo-url> dsh-user-markdown
+git clone https://github.com/TowardsDawn/dsh-user-markdown.git
 dsh plugin --profile web add "link:$((Get-Location).Path)\dsh-user-markdown"
 ```
 
 `link:` 前缀让 pnpm 建一个指向克隆目录的**软链**（不是拷贝），所以以后 `git pull` 或改源码后
-**只要重启 `dsh web` 就生效**，不用重新安装。
+**只要重启 `dsh web` 就生效**，不用重新安装 —— 适合二次开发。
 
-这条命令做三件事：
+两种方式都会自动完成这三件事：
 
 1. 把本包作为依赖装进 `~/.dsh/profiles/web`；
 2. 识别到本包声明了 `dsh.bundle.patch`，自动把 `dsh-user-markdown` 追加进

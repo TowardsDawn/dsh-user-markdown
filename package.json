@@ -13,6 +13,14 @@
     "bubble",
     "ui"
   ],
+  "homepage": "https://github.com/TowardsDawn/dsh-user-markdown#readme",
+  "bugs": {
+    "url": "https://github.com/TowardsDawn/dsh-user-markdown/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TowardsDawn/dsh-user-markdown.git"
+  },
   "license": "MIT",
   "engines": {
     "node": ">=22.19.0"
